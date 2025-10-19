@@ -3,9 +3,10 @@ buildscript {
         google()
         mavenCentral()
     }
+    ext.kotlin_version = '2.1.0'  // Update this
     dependencies {
-        // Updated to the version compatible with SDK 34 and modern build tools.
-        classpath 'com.android.tools.build:gradle:8.4.0'
+        classpath 'com.android.tools.build:gradle:8.6.0'  // Update this
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
