@@ -1,0 +1,47 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // Flutter Gradle Plugin must be applied after the Android and Kotlin plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.example.sentionet_draft3"
+    compileSdk = 34 // <-- ✅ Change back to 34
+    ndkVersion = flutter.ndkVersion
+
+    defaultConfig {
+        applicationId = "com.example.sentionet_draft3"
+        minSdk = 21
+        targetSdk = 34 // <-- ✅ Change back to 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+    // ✅ Java 17 compatibility
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildTypes {
+        release {
+            // ✅ Disable shrinking and minification for safe builds
+            shrinkResources false
+            minifyEnabled false
+            signingConfig = signingConfigs.debug
+        }
+        debug {
+            shrinkResources false
+            minifyEnabled false
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
