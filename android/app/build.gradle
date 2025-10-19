@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.sentionet_draft3"
-        minSdk = 21
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = 34 // <-- ✅ Change back to 34
         versionCode = 1
         versionName = "1.0"
