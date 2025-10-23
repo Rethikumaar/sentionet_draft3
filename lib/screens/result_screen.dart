@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../widgets/bottom_navbar.dart';
 
 class ResultScreen extends StatelessWidget {
   final Map<String, dynamic> apiResponse;
@@ -8,11 +9,12 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fusion = apiResponse["fusion_result"] ?? {};
-    final details = apiResponse["details"] ?? {};
+    final fusion = (apiResponse["fusion_result"] ?? {}) as Map<String, dynamic>;
+    final details = (apiResponse["details"] ?? {}) as Map<String, dynamic>;
 
     final risk = fusion["risk_level"] ?? "Unknown";
-    final score = (fusion["final_score"] ?? 0.0) * 100;
+    final finalScoreNum = fusion["final_score"] ?? 0.0;
+    final score = (finalScoreNum is num) ? (finalScoreNum * 100.0) : 0.0;
     final weights = Map<String, dynamic>.from(fusion["weights"] ?? {});
     final modal = Map<String, dynamic>.from(fusion["modalities"] ?? {});
 
@@ -25,29 +27,42 @@ class ResultScreen extends StatelessWidget {
             Center(
               child: Text(
                 "🧩 $risk",
-                style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold),
+                style:
+                const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 20),
-            _buildProgress("Final Score", score / 100, Colors.indigo),
+            _buildProgress("Final Score", (score / 100.0).clamp(0.0, 1.0),
+                Colors.indigo),
             const SizedBox(height: 25),
             const Text("🧠 Modality Breakdown",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            _buildBarChart(weights),
+            weights.isNotEmpty
+                ? _buildBarChart(weights)
+                : const Text("No modality weights available"),
             const SizedBox(height: 25),
             const Text("🎯 Modality Scores",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            ...modal.entries.map((e) => ListTile(
-              leading: const Icon(Icons.analytics),
-              title: Text(e.key.toUpperCase()),
-              subtitle:
-              Text("Score: ${(e.value['score'] * 100).toStringAsFixed(1)}%"),
-              trailing: Text(
-                  "Conf: ${(e.value['conf'] * 100).toStringAsFixed(1)}%"),
-            )),
+            if (modal.isEmpty)
+              const Text("No modality scores available.")
+            else
+              ...modal.entries.map((e) {
+                final v = e.value as Map<String, dynamic>;
+                final scorePct =
+                ((v['score'] ?? 0.0) is num) ? (v['score'] * 100) : 0.0;
+                final confPct =
+                ((v['conf'] ?? 0.0) is num) ? (v['conf'] * 100) : 0.0;
+                return ListTile(
+                  leading: const Icon(Icons.analytics),
+                  title: Text(e.key.toUpperCase()),
+                  subtitle:
+                  Text("Score: ${scorePct.toStringAsFixed(1)}%"),
+                  trailing:
+                  Text("Conf: ${confPct.toStringAsFixed(1)}%"),
+                );
+              }).toList(),
             const SizedBox(height: 20),
             Text("📝 Input Summary:\n${details["input_text"] ?? "No text"}"),
             const SizedBox(height: 30),
@@ -61,6 +76,7 @@ class ResultScreen extends StatelessWidget {
           ],
         ),
       ),
+      bottomNavigationBar: const BottomNavbar(currentIndex: 2),
     );
   }
 
@@ -75,7 +91,6 @@ class ResultScreen extends StatelessWidget {
           color: color,
           backgroundColor: Colors.grey.shade300,
           minHeight: 12,
-          borderRadius: BorderRadius.circular(8),
         ),
       ],
     );
@@ -87,27 +102,32 @@ class ResultScreen extends StatelessWidget {
       aspectRatio: 1.6,
       child: BarChart(
         BarChartData(
+          maxY: 100,
           barGroups: List.generate(entries.length, (i) {
             final e = entries[i];
+            final y = (e.value is num) ? (e.value * 100) : 0.0;
             return BarChartGroupData(
               x: i,
               barRods: [
                 BarChartRodData(
-                    toY: (e.value * 100),
-                    color: Colors.indigoAccent,
-                    width: 18)
+                  toY: y,
+                  color: Colors.indigoAccent,
+                  width: 18,
+                )
               ],
             );
           }),
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                getTitlesWidget: (value, _) {
-                  return Text(entries[value.toInt()].key);
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= entries.length)
+                    return const SizedBox.shrink();
+                  return Text(entries[idx].key,
+                      style: const TextStyle(fontSize: 10));
                 },
               ),
             ),

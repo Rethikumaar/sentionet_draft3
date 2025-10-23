@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../widgets/bottom_navbar.dart';
 import 'profile_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -8,17 +10,29 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool isLoggedIn = false; // 🔐 Change this after Firebase setup
+  User? currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    currentUser = FirebaseAuth.instance.currentUser;
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      setState(() => currentUser = user);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    bool isLoggedIn = currentUser != null;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            Image.asset('assets/logo.png', height: 32, errorBuilder: (_, __, ___) {
-              return const Icon(Icons.psychology_alt, color: Colors.indigoAccent);
-            }),
+            Image.asset('assets/logo.png',
+                height: 32,
+                errorBuilder: (_, __, ___) =>
+                const Icon(Icons.psychology_alt, color: Colors.white)),
             const SizedBox(width: 8),
             const Text('SentioNet'),
           ],
@@ -31,9 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                     context, MaterialPageRoute(builder: (_) => ProfileScreen()));
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Login feature coming soon!")),
-                );
+                Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const LoginScreen()));
               }
             },
           ),
@@ -47,6 +60,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: const BottomNavbar(currentIndex: 0),
+
+
     );
   }
 }
