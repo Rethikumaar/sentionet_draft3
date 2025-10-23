@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "133620509973",
+    "project_id": "sentionet",
+    "storage_bucket": "sentionet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:133620509973:android:6638ae01a6804a4479cd1c",
+        "android_client_info": {
+          "package_name": "com.example.sentionet_draft3"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjl-eyo6hgS_WjtXE9SE__c0wp7rKWrl0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
