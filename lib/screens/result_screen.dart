@@ -62,7 +62,7 @@ class ResultScreen extends StatelessWidget {
                   trailing:
                   Text("Conf: ${confPct.toStringAsFixed(1)}%"),
                 );
-              }).toList(),
+              }),
             const SizedBox(height: 20),
             Text("📝 Input Summary:\n${details["input_text"] ?? "No text"}"),
             const SizedBox(height: 30),
@@ -118,14 +118,15 @@ class ResultScreen extends StatelessWidget {
             );
           }),
           titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
                   final idx = value.toInt();
-                  if (idx < 0 || idx >= entries.length)
+                  if (idx < 0 || idx >= entries.length) {
                     return const SizedBox.shrink();
+                  }
                   return Text(entries[idx].key,
                       style: const TextStyle(fontSize: 10));
                 },
@@ -133,7 +134,7 @@ class ResultScreen extends StatelessWidget {
             ),
           ),
           borderData: FlBorderData(show: false),
-          gridData: FlGridData(show: false),
+          gridData: const FlGridData(show: false),
         ),
       ),
     );

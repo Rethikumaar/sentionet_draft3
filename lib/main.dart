@@ -34,7 +34,7 @@ class SentioNetApp extends StatelessWidget {
           centerTitle: true,
         ),
       ),
-      home: SplashScreen(),
+      home: const SplashScreen(),
     );
   }
 }
