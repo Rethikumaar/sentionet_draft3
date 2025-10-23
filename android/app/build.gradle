@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.example.sentionet_draft3"
-    compileSdk = 34 // <-- ✅ Change back to 34
+    compileSdk = 35 // <-- ✅ Change back to 34
     ndkVersion = flutter.ndkVersion
 
     defaultConfig {
