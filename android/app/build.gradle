@@ -10,13 +10,13 @@ plugins {
 
 android {
     namespace = "com.example.sentionet_draft3"
-    compileSdk = 35 // <-- ✅ Change back to 34
+    compileSdk = 36// <-- ✅ Change back to 34
     ndkVersion = flutter.ndkVersion
 
     defaultConfig {
         applicationId = "com.example.sentionet_draft3"
         minSdkVersion  flutter.minSdkVersion
-        targetSdk = 35 // <-- ✅ Change back to 34
+        targetSdk = 36 // <-- ✅ Change back to 34
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled true

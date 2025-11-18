@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:sentionet_draft3/screens/test_screen.dart';
 import '../widgets/bottom_navbar.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
@@ -153,7 +154,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.analytics_outlined,
                   title: "Start Test",
                   color: Colors.indigoAccent,
-                  onTap: () => Navigator.pushNamed(context, '/test'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TestScreen()),
+                    );
+                  },
+
                 ),
                 _buildActionCard(
                   icon: Icons.history,

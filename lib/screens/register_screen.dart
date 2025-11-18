@@ -39,7 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       User? user = userCred.user;
 
-      // Save to Firestore
+      print(user?.uid);
       if (user != null) {
         await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
           "uid": user.uid,

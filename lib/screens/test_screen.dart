@@ -1,4 +1,5 @@
 // lib/screens/test_screen.dart
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:camera/camera.dart';
@@ -38,11 +39,10 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
   final List<XFile> _captured = [];
   final TextEditingController _textController = TextEditingController();
 
-  final Map<String, int> _phqAnswers = {
-    for (int i = 1; i <= 10; i++) "q$i": 0,
-  };
+  final Map<String, int> _phqAnswers = {for (int i = 1; i <= 10; i++) "q$i": 0};
 
   bool _loading = false;
+
   final String apiUrl = "https://akash297-tepi.hf.space/predict";
 
   @override
@@ -55,13 +55,12 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
   Future<void> _initCamera() async {
     try {
       _cameras = await availableCameras();
-      final front = _cameras.firstWhere(
-            (c) => c.lensDirection == CameraLensDirection.front,
-      );
+      final front =
+      _cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front);
 
       _controller = CameraController(
         front,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
@@ -82,10 +81,10 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
 
     try {
       final XFile file = await _controller!.takePicture();
-
       final image = InputImage.fromFilePath(file.path);
       final faces = await _faceDetector.processImage(image);
 
+      // INVALID — delete + do NOT keep
       if (faces.isEmpty) {
         faceStatus = "No face detected";
         faceStatusColor = Colors.redAccent;
@@ -94,35 +93,44 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
       } else if (faces.length > 1) {
         faceStatus = "Multiple faces";
         faceStatusColor = Colors.redAccent;
-        _showMessage("Only one person should be visible.");
+        _showMessage("Only one face allowed.");
         await File(file.path).delete();
       } else {
+        // VALID — keep
         faceStatus = "Perfect!";
         faceStatusColor = Colors.green;
         setState(() => _captured.insert(0, file));
       }
     } catch (e) {
-      _showMessage("Failed: $e");
+      _showMessage("Capture failed: $e");
     } finally {
       setState(() => _loading = false);
     }
   }
 
   Future<String?> _upload(XFile file, int i) async {
+    final local = File(file.path);
+
+    if (!local.existsSync()) {
+      print("UPLOAD FAILED → File does NOT exist: ${file.path}");
+      return null;
+    }
+
     try {
       final ref = FirebaseStorage.instance
           .ref("patient_images/${DateTime.now().millisecondsSinceEpoch}_$i.jpg");
 
-      await ref.putFile(File(file.path));
+      await ref.putFile(local);
       return await ref.getDownloadURL();
     } catch (e) {
+      print("UPLOAD ERROR: $e");
       return null;
     }
   }
 
   Future<void> _submit() async {
-    if (_captured.isEmpty && _textController.text.isEmpty) {
-      _showMessage("Please provide either a photo or text.");
+    if (_captured.isEmpty && _textController.text.trim().isEmpty) {
+      _showMessage("Provide at least a valid face photo or text.");
       return;
     }
 
@@ -132,22 +140,25 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
       final user = FirebaseAuth.instance.currentUser;
       List<String> urls = [];
 
+      // Upload valid images
       for (int i = 0; i < _captured.length; i++) {
         final url = await _upload(_captured[i], i);
         if (url != null) urls.add(url);
       }
 
+      // Build the API payload
       final payload = {
         "phq_responses": _phqAnswers,
         "text": _textController.text.trim(),
         "images": urls,
       };
 
-      final res = await http.post(
-        Uri.parse(apiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(payload),
-      );
+      // API call with timeout
+      final res = await http
+          .post(Uri.parse(apiUrl),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(payload))
+          .timeout(const Duration(seconds: 20));
 
       if (res.statusCode != 200) {
         _showMessage("API error: ${res.statusCode}");
@@ -156,6 +167,7 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
 
       final data = jsonDecode(res.body);
 
+      // Save to Firestore
       if (user != null) {
         await FirebaseFirestore.instance
             .collection("users")
@@ -170,13 +182,14 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
         });
       }
 
+      // Go to result page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => ResultScreen(
             apiResponse: data,
             phqAnswers: _phqAnswers,
-            inputText: _textController.text,
+            inputText: _textController.text.trim(),
             imageUrls: urls,
           ),
         ),
@@ -213,7 +226,7 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
               ? const Center(child: CircularProgressIndicator())
               : Column(
             children: [
-              // -------- CAMERA WITH STATUS --------
+              // CAMERA AREA
               AspectRatio(
                 aspectRatio: _controller!.value.aspectRatio,
                 child: Stack(
@@ -222,8 +235,6 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(12),
                       child: CameraPreview(_controller!),
                     ),
-
-                    // FACE STATUS
                     Positioned(
                       top: 12,
                       left: 12,
@@ -237,17 +248,16 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                           faceStatus,
                           style: TextStyle(
                             color: faceStatusColor,
-                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
 
-              // -------- CAPTURE BUTTON --------
+              // CAPTURE BUTTON
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: GestureDetector(
@@ -258,12 +268,6 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.indigo,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.indigo.withOpacity(.4),
-                          blurRadius: 10,
-                        )
-                      ],
                     ),
                     child: const Icon(Icons.camera_alt,
                         color: Colors.white, size: 32),
@@ -271,7 +275,7 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                 ),
               ),
 
-              // -------- THUMBNAILS --------
+              // THUMBNAILS
               if (_captured.isNotEmpty)
                 SizedBox(
                   height: 110,
@@ -283,8 +287,8 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                       return Stack(
                         children: [
                           Container(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 8),
+                            margin:
+                            const EdgeInsets.symmetric(horizontal: 8),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: Image.file(
@@ -299,13 +303,15 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
                             right: 10,
                             top: 10,
                             child: GestureDetector(
-                              onTap: () => setState(
-                                      () => _captured.removeAt(i)),
+                              onTap: () {
+                                setState(() => _captured.removeAt(i));
+                                File(f.path).delete();
+                              },
                               child: const CircleAvatar(
                                 radius: 12,
                                 backgroundColor: Colors.black54,
                                 child: Icon(Icons.close,
-                                    color: Colors.white, size: 15),
+                                    size: 15, color: Colors.white),
                               ),
                             ),
                           )
@@ -317,105 +323,103 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver {
 
               const Divider(),
 
-              // -------- FORM AREA --------
+              // FORM AREA
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("🧠 PHQ-10",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-
-                      ...List.generate(10, (i) {
-                        final qNum = i + 1;
-                        return Card(
-                          elevation: 1,
-                          child: ExpansionTile(
-                            title: Text(_questions[i]),
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                                children: List.generate(4, (score) {
-                                  return Row(
-                                    children: [
-                                      Radio(
-                                        value: score,
-                                        groupValue:
-                                        _phqAnswers["q$qNum"],
-                                        onChanged: (v) => setState(() {
-                                          _phqAnswers["q$qNum"] =
-                                          v as int;
-                                        }),
-                                      ),
-                                      Text("$score"),
-                                    ],
-                                  );
-                                }),
-                              )
-                            ],
-                          ),
-                        );
-                      }),
-
-                      const SizedBox(height: 12),
-                      const Text("💬 Text Input",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-
-                      TextField(
-                        controller: _textController,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          hintText: "Describe your feelings...",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                      Center(
-                        child: ElevatedButton.icon(
-                          onPressed: _submit,
-                          icon: const Icon(Icons.analytics),
-                          label: const Text("Analyze"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 40, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius:
-                                BorderRadius.circular(30)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                child: _buildForm(),
               ),
             ],
           ),
         ),
 
-        // -------- LOADING OVERLAY --------
+        // LOADING OVERLAY
         if (_loading)
           Container(
-            color: Colors.black45,
+            color: Colors.black38,
             child: const Center(
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 3,
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildForm() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("🧠 PHQ-10",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+
+          ...List.generate(10, (i) {
+            final qNum = i + 1;
+            return Card(
+              elevation: 1,
+              child: ExpansionTile(
+                title: Text(_questions[i]),
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(4, (score) {
+                      return Row(
+                        children: [
+                          Radio(
+                            value: score,
+                            groupValue: _phqAnswers["q$qNum"],
+                            onChanged: (v) {
+                              setState(() {
+                                _phqAnswers["q$qNum"] = v as int;
+                              });
+                            },
+                          ),
+                          Text("$score"),
+                        ],
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 12),
+
+          const Text("💬 Text Input",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+
+          TextField(
+            controller: _textController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: "Describe your feelings...",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-          )
-      ],
+          ),
+
+          const SizedBox(height: 20),
+
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _submit,
+              icon: const Icon(Icons.analytics),
+              label: const Text("Analyze"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                padding:
+                const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
