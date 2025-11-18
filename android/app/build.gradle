@@ -15,8 +15,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.sentionet_draft3"
-        minSdkVersion = flutter.minSdkVersion
-        targetSdk = 34 // <-- ✅ Change back to 34
+        minSdkVersion  flutter.minSdkVersion
+        targetSdk = 35 // <-- ✅ Change back to 34
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled true

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../screens/home_screen.dart';
-import '../screens/test_screen.dart';
-import '../screens/result_screen.dart';
-import '../screens/settings_screen.dart';
+import '../screens/features_screen.dart';
+import '../screens/pricing_screen.dart';
+import '../screens/testimonials_screen.dart';
 
 class BottomNavbar extends StatelessWidget {
   final int currentIndex;
@@ -12,37 +12,64 @@ class BottomNavbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return NavigationBar(
+      height: 70,
+      backgroundColor: Colors.white,
+      indicatorColor: Colors.indigo.withOpacity(0.2),
+      elevation: 3,
       selectedIndex: currentIndex,
       onDestinationSelected: (index) {
+        if (index == currentIndex) return; // Prevent reloading same page
+
+        Widget nextScreen;
         switch (index) {
           case 0:
-            Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+            nextScreen = const HomeScreen();
             break;
           case 1:
-            Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => const TestScreen()));
+            nextScreen = const FeaturesScreen();
             break;
           case 2:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const ResultScreen(apiResponse: {}),
-              ),
-            );
+            nextScreen = const PricingScreen();
             break;
-
           case 3:
-            Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            nextScreen = const TestimonialScreen();
             break;
+          default:
+            nextScreen = const HomeScreen();
         }
+
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => nextScreen,
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (_, animation, __, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        );
       },
       destinations: const [
-        NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.quiz), label: 'Test'),
-        NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Results'),
-        NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home, color: Colors.indigo),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.star_border),
+          selectedIcon: Icon(Icons.star, color: Colors.indigo),
+          label: 'Features',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.attach_money_outlined),
+          selectedIcon: Icon(Icons.attach_money, color: Colors.indigo),
+          label: 'Pricing',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.reviews_outlined),
+          selectedIcon: Icon(Icons.reviews, color: Colors.indigo),
+          label: 'Testimonials',
+        ),
       ],
     );
   }

@@ -1,142 +1,218 @@
+// lib/screens/result_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/bottom_navbar.dart';
 
 class ResultScreen extends StatelessWidget {
   final Map<String, dynamic> apiResponse;
+  final Map<String, int>? phqAnswers;
+  final String? inputText;
+  final List<String>? imageUrls;
 
-  const ResultScreen({super.key, required this.apiResponse});
+  const ResultScreen({
+    super.key,
+    required this.apiResponse,
+    this.phqAnswers,
+    this.inputText,
+    this.imageUrls,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final fusion = (apiResponse["fusion_result"] ?? {}) as Map<String, dynamic>;
-    final details = (apiResponse["details"] ?? {}) as Map<String, dynamic>;
-
+    final fusion = apiResponse["fusion_result"] ?? {};
     final risk = fusion["risk_level"] ?? "Unknown";
-    final finalScoreNum = fusion["final_score"] ?? 0.0;
-    final score = (finalScoreNum is num) ? (finalScoreNum * 100.0) : 0.0;
-    final weights = Map<String, dynamic>.from(fusion["weights"] ?? {});
-    final modal = Map<String, dynamic>.from(fusion["modalities"] ?? {});
+
+    // FIX: Convert num → double
+    final score = ((fusion["final_score"] ?? 0.0) as num).toDouble() * 100;
+
+    final weights = (fusion["weights"] ?? {}) as Map<String, dynamic>;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Result Analysis")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            Center(
-              child: Text(
-                "🧩 $risk",
-                style:
-                const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildProgress("Final Score", (score / 100.0).clamp(0.0, 1.0),
-                Colors.indigo),
-            const SizedBox(height: 25),
-            const Text("🧠 Modality Breakdown",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            weights.isNotEmpty
-                ? _buildBarChart(weights)
-                : const Text("No modality weights available"),
-            const SizedBox(height: 25),
-            const Text("🎯 Modality Scores",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            if (modal.isEmpty)
-              const Text("No modality scores available.")
-            else
-              ...modal.entries.map((e) {
-                final v = e.value as Map<String, dynamic>;
-                final scorePct =
-                ((v['score'] ?? 0.0) is num) ? (v['score'] * 100) : 0.0;
-                final confPct =
-                ((v['conf'] ?? 0.0) is num) ? (v['conf'] * 100) : 0.0;
-                return ListTile(
-                  leading: const Icon(Icons.analytics),
-                  title: Text(e.key.toUpperCase()),
-                  subtitle:
-                  Text("Score: ${scorePct.toStringAsFixed(1)}%"),
-                  trailing:
-                  Text("Conf: ${confPct.toStringAsFixed(1)}%"),
-                );
-              }),
-            const SizedBox(height: 20),
-            Text("📝 Input Summary:\n${details["input_text"] ?? "No text"}"),
-            const SizedBox(height: 30),
-            Center(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text("Try Again"),
-                onPressed: () => Navigator.pop(context),
-              ),
-            )
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text("Result Overview"),
+        backgroundColor: Colors.indigo,
       ),
       bottomNavigationBar: const BottomNavbar(currentIndex: 2),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.indigo,
+        onPressed: () => Navigator.pushNamed(context, "/home"),
+        label: const Text("Back to Home"),
+        icon: const Icon(Icons.home),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildRiskCard(risk, score),
+          const SizedBox(height: 20),
+          _buildBarChart(weights),
+          const SizedBox(height: 20),
+          _buildSummarySection(),
+        ],
+      ),
     );
   }
 
-  Widget _buildProgress(String label, double value, Color color) {
+  // ---------------- RISK CARD ----------------
+
+  Widget _buildRiskCard(String risk, double score) {
+    final baseColor = risk == "High"
+        ? Colors.red
+        : risk == "Moderate"
+        ? Colors.orange
+        : Colors.green;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            baseColor.withValues(alpha: 0.70), // FIXED
+            baseColor.withValues(alpha: 1.00), // FIXED
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: baseColor.withValues(alpha: 0.40), // FIXED
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            risk,
+            style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "Final Score: ${score.toStringAsFixed(1)}%",
+            style: const TextStyle(color: Colors.white, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: score / 100,
+            color: Colors.white,
+            backgroundColor: Colors.white24,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- BAR CHART ----------------
+
+  Widget _buildBarChart(Map<String, dynamic> weights) {
+    if (weights.isEmpty) {
+      return const Text("No modality data");
+    }
+
+    final entries = weights.entries.toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("$label: ${(value * 100).toStringAsFixed(1)}%"),
-        const SizedBox(height: 6),
-        LinearProgressIndicator(
-          value: value,
-          color: color,
-          backgroundColor: Colors.grey.shade300,
-          minHeight: 12,
+        const Text("Modality Contribution",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        AspectRatio(
+          aspectRatio: 1.7,
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(entries.length, (i) {
+                // FIX: num → double
+                final y = (entries[i].value as num).toDouble() * 100;
+
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: y,
+                      color: Colors.indigo,
+                      width: 20,
+                      borderRadius: BorderRadius.circular(6),
+                    )
+                  ],
+                );
+              }),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, _) {
+                      int index = value.toInt();
+                      if (index >= 0 && index < entries.length) {
+                        return Text(entries[index].key, style: const TextStyle(fontSize: 12));
+                      }
+                      return const Text("");
+                    },
+                  ),
+                ),
+                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: const FlGridData(show: false),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildBarChart(Map<String, dynamic> weights) {
-    final entries = weights.entries.toList();
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: BarChart(
-        BarChartData(
-          maxY: 100,
-          barGroups: List.generate(entries.length, (i) {
-            final e = entries[i];
-            final y = (e.value is num) ? (e.value * 100) : 0.0;
-            return BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: y,
-                  color: Colors.indigoAccent,
-                  width: 18,
-                )
-              ],
-            );
-          }),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final idx = value.toInt();
-                  if (idx < 0 || idx >= entries.length) {
-                    return const SizedBox.shrink();
-                  }
-                  return Text(entries[idx].key,
-                      style: const TextStyle(fontSize: 10));
-                },
-              ),
+  // ---------------- SUMMARY ----------------
+
+  Widget _buildSummarySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Input Summary",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+
+        if (phqAnswers != null)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.quiz, color: Colors.indigo),
+              title: const Text("PHQ-10 Responses"),
+              subtitle: Text(phqAnswers.toString()),
             ),
           ),
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-        ),
-      ),
+
+        if (inputText != null && inputText!.isNotEmpty)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.textsms, color: Colors.indigo),
+              title: const Text("User Text Input"),
+              subtitle: Text(inputText!),
+            ),
+          ),
+
+        if (imageUrls != null && imageUrls!.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Captured Images",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 90,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: imageUrls!
+                      .map((url) => Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(url, width: 100, fit: BoxFit.cover),
+                    ),
+                  ))
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }

@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import 'register_screen.dart';
-import 'home_screen.dart';
+import 'role_router.dart';   // ⬅ IMPORTANT
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,64 +12,123 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final AuthService _auth = AuthService();
+  final _emailCtrl = TextEditingController();
+  final _pwdCtrl = TextEditingController();
   bool _loading = false;
 
-  Future<void> _login() async {
+  // ---------------- EMAIL LOGIN ----------------
+  Future<void> _signInEmail() async {
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      await _auth.signInWithEmail(
+        _emailCtrl.text.trim(),
+        _pwdCtrl.text.trim(),
       );
+
       if (!mounted) return;
+
+      // ⬅ REDIRECT BASED ON ROLE
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const RoleRouter()),
       );
+
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message ?? "Login failed")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Login failed')),
+      );
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  // ---------------- GOOGLE LOGIN ----------------
+  Future<void> _signInGoogle() async {
+    setState(() => _loading = true);
+
+    try {
+      final cred = await _auth.signInWithGoogle();
+
+      if (cred != null && mounted) {
+        // ⬅ GOOGLE USERS ALSO GO THROUGH ROLE ROUTER
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const RoleRouter()),
+        );
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google sign-in failed: $e')),
+      );
     } finally {
       setState(() => _loading = false);
     }
   }
 
   @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _pwdCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Login")),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(20),
+      appBar: AppBar(title: const Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(18),
         child: Column(
           children: [
             TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: "Email"),
+              controller: _emailCtrl,
+              decoration: const InputDecoration(labelText: 'Email'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
             TextField(
-              controller: _passwordController,
+              controller: _pwdCtrl,
               obscureText: true,
-              decoration: const InputDecoration(labelText: "Password"),
+              decoration: const InputDecoration(labelText: 'Password'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
             ElevatedButton(
-              onPressed: _login,
-              child: const Text("Login"),
+              onPressed: _loading ? null : _signInEmail,
+              child: _loading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Login'),
             ),
+
+            const SizedBox(height: 12),
+
+            ElevatedButton.icon(
+              icon: Image.asset(
+                'assets/google_logo.png',
+                height: 18,
+                width: 18,
+                errorBuilder: (_, __, ___) =>
+                const Icon(Icons.login, color: Colors.black),
+              ),
+              label: const Text('Sign in with Google'),
+              onPressed: _loading ? null : _signInGoogle,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
             TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                );
-              },
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+              ),
               child: const Text("Create new account"),
-            )
+            ),
           ],
         ),
       ),
