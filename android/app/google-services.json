@@ -12,7 +12,20 @@
           "package_name": "com.example.sentionet_draft3"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "133620509973-llaeq06f5negpilf0o67jehh69mn1p79.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sentionet_draft3",
+            "certificate_hash": "bd65714600ceee36e31c6ba97e6769579284b808"
+          }
+        },
+        {
+          "client_id": "133620509973-832r99vp8r6dksekb2lcah7gpgnsa63n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAjl-eyo6hgS_WjtXE9SE__c0wp7rKWrl0"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "133620509973-832r99vp8r6dksekb2lcah7gpgnsa63n.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "133620509973-i6hi75cruje32ss98ohvhfrnnhlsitgq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.sentionetDraft3"
+              }
+            }
+          ]
         }
       }
     }

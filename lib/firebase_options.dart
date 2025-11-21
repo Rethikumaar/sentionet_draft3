@@ -64,6 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '133620509973',
     projectId: 'sentionet',
     storageBucket: 'sentionet.firebasestorage.app',
+    iosClientId: '133620509973-i6hi75cruje32ss98ohvhfrnnhlsitgq.apps.googleusercontent.com',
     iosBundleId: 'com.example.sentionetDraft3',
   );
 
@@ -73,6 +74,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '133620509973',
     projectId: 'sentionet',
     storageBucket: 'sentionet.firebasestorage.app',
+    iosClientId: '133620509973-i6hi75cruje32ss98ohvhfrnnhlsitgq.apps.googleusercontent.com',
     iosBundleId: 'com.example.sentionetDraft3',
   );
 
@@ -85,4 +87,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'sentionet.firebasestorage.app',
     measurementId: 'G-VFBZHWVP1L',
   );
+
 }
