@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "133620509973-llaeq06f5negpilf0o67jehh69mn1p79.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sentionet_draft3",
+            "certificate_hash": "bd65714600ceee36e31c6ba97e6769579284b808"
+          }
+        },
+        {
           "client_id": "133620509973-832r99vp8r6dksekb2lcah7gpgnsa63n.apps.googleusercontent.com",
           "client_type": 3
         }
