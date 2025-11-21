@@ -1,6 +1,8 @@
 // lib/screens/result_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/bottom_navbar.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -47,6 +50,34 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
     );
 
     _animationController.forward();
+    _saveResultToFirestore();
+  }
+
+  // Save result to Firestore
+  Future<void> _saveResultToFirestore() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .collection("responses")
+          .add({
+        "api_result": widget.apiResponse,
+        "phq_answers": widget.phqAnswers,
+        "input_text": widget.inputText,
+        "image_urls": widget.imageUrls,
+        "timestamp": FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("Error saving result: $e");
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -115,20 +146,17 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
               ),
               child: Column(
                 children: [
-                  // Risk Card
                   ScaleTransition(
                     scale: _scaleAnimation,
                     child: _buildRiskCard(risk, score, isDesktop, isTablet),
                   ),
                   SizedBox(height: isDesktop ? 32 : 24),
-
-                  // Bar Chart
                   _buildBarChart(weights, isDesktop, isTablet),
                   SizedBox(height: isDesktop ? 32 : 24),
-
-                  // Summary Section
+                  _buildRecommendations(risk, score, isDesktop, isTablet),
+                  SizedBox(height: isDesktop ? 32 : 24),
                   _buildSummarySection(isDesktop, isTablet),
-                  const SizedBox(height: 80), // Space for FAB
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -139,17 +167,8 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
   }
 
   Widget _buildRiskCard(String risk, double score, bool isDesktop, bool isTablet) {
-    final baseColor = risk == "High"
-        ? Colors.red
-        : risk == "Moderate"
-        ? Colors.orange
-        : Colors.green;
-
-    final icon = risk == "High"
-        ? Icons.warning_rounded
-        : risk == "Moderate"
-        ? Icons.info_rounded
-        : Icons.check_circle_rounded;
+    final baseColor = _getRiskColor(risk);
+    final icon = _getRiskIcon(risk);
 
     return Container(
       padding: EdgeInsets.all(isDesktop ? 36 : (isTablet ? 32 : 28)),
@@ -173,7 +192,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
       ),
       child: Column(
         children: [
-          // Icon
           Container(
             padding: EdgeInsets.all(isDesktop ? 20 : 16),
             decoration: BoxDecoration(
@@ -187,8 +205,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             ),
           ),
           SizedBox(height: isDesktop ? 24 : 20),
-
-          // Risk Level
           Text(
             "$risk Risk Level",
             style: TextStyle(
@@ -200,8 +216,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             textAlign: TextAlign.center,
           ),
           SizedBox(height: isDesktop ? 16 : 12),
-
-          // Score
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: isDesktop ? 24 : 20,
@@ -221,8 +235,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             ),
           ),
           SizedBox(height: isDesktop ? 24 : 20),
-
-          // Progress Bar
           Container(
             height: isDesktop ? 12 : 10,
             decoration: BoxDecoration(
@@ -243,6 +255,32 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
     );
   }
 
+  Color _getRiskColor(String risk) {
+    switch (risk.toLowerCase()) {
+      case "high":
+        return Colors.red;
+      case "moderate":
+        return Colors.orange;
+      case "low":
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getRiskIcon(String risk) {
+    switch (risk.toLowerCase()) {
+      case "high":
+        return Icons.warning_rounded;
+      case "moderate":
+        return Icons.info_rounded;
+      case "low":
+        return Icons.check_circle_rounded;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
   Widget _buildBarChart(Map<String, dynamic> weights, bool isDesktop, bool isTablet) {
     if (weights.isEmpty) {
       return Container(
@@ -261,10 +299,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
         child: const Center(
           child: Text(
             "No modality data available",
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ),
       );
@@ -332,6 +367,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
                 maxY: 100,
                 barGroups: List.generate(entries.length, (i) {
                   final y = (entries[i].value as num).toDouble() * 100;
+                  final color = _getModalityColor(i);
 
                   return BarChartGroupData(
                     x: i,
@@ -342,8 +378,8 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
                           colors: [
-                            Colors.indigo.shade400,
-                            Colors.indigo.shade700,
+                            color.withValues(alpha: 0.7),
+                            color,
                           ],
                         ),
                         width: isDesktop ? 40 : (isTablet ? 32 : 24),
@@ -372,7 +408,7 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
                               style: TextStyle(
                                 fontSize: isDesktop ? 14 : (isTablet ? 13 : 12),
                                 fontWeight: FontWeight.w600,
-                                color: Colors.indigo.shade700,
+                                color: _getModalityColor(index),
                               ),
                             ),
                           );
@@ -418,6 +454,128 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
         ],
       ),
     );
+  }
+
+  Color _getModalityColor(int index) {
+    final colors = [
+      Colors.indigo.shade700,
+      Colors.purple.shade600,
+      Colors.blue.shade600,
+      Colors.teal.shade600,
+    ];
+    return colors[index % colors.length];
+  }
+
+  Widget _buildRecommendations(String risk, double score, bool isDesktop, bool isTablet) {
+    final recommendations = _getRecommendations(risk, score);
+
+    return Container(
+      padding: EdgeInsets.all(isDesktop ? 32 : (isTablet ? 28 : 24)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade400, Colors.teal.shade400],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.lightbulb_outline,
+                  color: Colors.white,
+                  size: isDesktop ? 28 : 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Recommendations",
+                style: TextStyle(
+                  fontSize: isDesktop ? 24 : (isTablet ? 22 : 20),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.indigo.shade900,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isDesktop ? 20 : 16),
+          ...recommendations.map((rec) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    size: 16,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    rec,
+                    style: TextStyle(
+                      fontSize: isDesktop ? 16 : 15,
+                      color: Colors.black87,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  List<String> _getRecommendations(String risk, double score) {
+    if (risk.toLowerCase() == "high" || score > 70) {
+      return [
+        "Consider scheduling an appointment with a mental health professional",
+        "Practice daily mindfulness or meditation for 10-15 minutes",
+        "Maintain a regular sleep schedule and aim for 7-9 hours",
+        "Engage in physical activity at least 30 minutes daily",
+        "Connect with supportive friends or family members",
+      ];
+    } else if (risk.toLowerCase() == "moderate" || score > 40) {
+      return [
+        "Monitor your mental health and take note of any changes",
+        "Practice stress-reduction techniques like deep breathing",
+        "Maintain social connections and engage in enjoyable activities",
+        "Ensure adequate sleep and balanced nutrition",
+        "Consider journaling to process your thoughts and feelings",
+      ];
+    } else {
+      return [
+        "Continue your current healthy habits and routines",
+        "Stay connected with your support network",
+        "Maintain regular physical activity and good sleep hygiene",
+        "Practice gratitude and positive thinking",
+        "Be aware of your mental health and check in with yourself regularly",
+      ];
+    }
   }
 
   Widget _buildSummarySection(bool isDesktop, bool isTablet) {
@@ -466,7 +624,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
           ),
           SizedBox(height: isDesktop ? 24 : 20),
 
-          // PHQ-10 Responses
           if (widget.phqAnswers != null) ...[
             _buildSummaryCard(
               icon: Icons.psychology_outlined,
@@ -500,7 +657,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             const SizedBox(height: 16),
           ],
 
-          // Text Input
           if (widget.inputText != null && widget.inputText!.isNotEmpty) ...[
             _buildSummaryCard(
               icon: Icons.chat_bubble_outline,
@@ -528,7 +684,6 @@ class _ResultScreenState extends State<ResultScreen> with SingleTickerProviderSt
             const SizedBox(height: 16),
           ],
 
-          // Captured Images
           if (widget.imageUrls != null && widget.imageUrls!.isNotEmpty)
             _buildSummaryCard(
               icon: Icons.photo_camera,
