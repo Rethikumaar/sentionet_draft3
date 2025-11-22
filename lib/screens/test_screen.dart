@@ -1,4 +1,4 @@
-// lib/screens/test_screen.dart
+// Updated test_screen.dart - Upload images to Cloudinary and send URLs
 
 import 'dart:convert';
 import 'dart:io';
@@ -6,7 +6,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -44,6 +43,11 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver, Ti
   bool _loading = false;
 
   final String apiUrl = "https://akash297-tepi.hf.space/predict";
+
+  // Cloudinary Configuration
+  // IMPORTANT: Replace these with your actual Cloudinary credentials
+  final String cloudinaryCloudName = "dqqrwpirf"; // e.g., "dxxxxxx"
+  final String cloudinaryUploadPreset = "phq_image"; // Create an unsigned preset in Cloudinary settings
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -118,22 +122,53 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver, Ti
     }
   }
 
-  Future<String?> _upload(XFile file, int i) async {
-    final local = File(file.path);
-
-    if (!local.existsSync()) {
-      print("UPLOAD FAILED → File does NOT exist: ${file.path}");
-      return null;
-    }
-
+  // Upload image to Cloudinary and return URL
+  Future<String?> _uploadToCloudinary(XFile file, int index) async {
     try {
-      final ref = FirebaseStorage.instance
-          .ref("patient_images/${DateTime.now().millisecondsSinceEpoch}_$i.jpg");
+      final imageFile = File(file.path);
 
-      await ref.putFile(local);
-      return await ref.getDownloadURL();
+      if (!imageFile.existsSync()) {
+        print("❌ Upload failed: File does not exist at ${file.path}");
+        return null;
+      }
+
+      final url = Uri.parse(
+          "https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload"
+      );
+
+      final request = http.MultipartRequest('POST', url);
+
+      // Add upload preset (unsigned upload)
+      request.fields['upload_preset'] = cloudinaryUploadPreset;
+
+      // Optional: Add folder organization
+      request.fields['folder'] = 'patient_images';
+
+      // Optional: Add timestamp to filename
+      request.fields['public_id'] = 'image_${DateTime.now().millisecondsSinceEpoch}_$index';
+
+      // Attach the image file
+      request.files.add(
+          await http.MultipartFile.fromPath('file', imageFile.path)
+      );
+
+      print("📤 Uploading image ${index + 1} to Cloudinary...");
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(responseData);
+        final imageUrl = jsonResponse['secure_url'] as String;
+        print("✅ Image ${index + 1} uploaded: $imageUrl");
+        return imageUrl;
+      } else {
+        print("❌ Cloudinary upload failed with status: ${response.statusCode}");
+        print("Response: $responseData");
+        return null;
+      }
     } catch (e) {
-      print("UPLOAD ERROR: $e");
+      print("❌ Error uploading to Cloudinary: $e");
       return null;
     }
   }
@@ -149,20 +184,35 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver, Ti
     try {
       final user = FirebaseAuth.instance.currentUser;
 
-      List<String> urls = [];
+      // Upload images to Cloudinary and collect URLs
+      List<String> imageUrls = [];
+      print("===== UPLOADING IMAGES TO CLOUDINARY =====");
 
       for (int i = 0; i < _captured.length; i++) {
-        final url = await _upload(_captured[i], i);
-        if (url != null) urls.add(url);
+        final url = await _uploadToCloudinary(_captured[i], i);
+        if (url != null) {
+          imageUrls.add(url);
+        } else {
+          print("⚠️ Failed to upload image ${i + 1}");
+        }
       }
 
+      if (_captured.isNotEmpty && imageUrls.isEmpty) {
+        _showMessage("Failed to upload images. Please check your internet connection.");
+        setState(() => _loading = false);
+        return;
+      }
+
+      print("===== TOTAL URLs COLLECTED: ${imageUrls.length} =====");
+
+      // Build payload with image URLs
       final payload = {
         "phq_responses": _phqAnswers,
         "text": _textController.text.trim(),
-        "images": urls,
+        "images": imageUrls, // ✅ Sending Cloudinary URLs
       };
 
-      print("===== SENDING PAYLOAD =====");
+      print("===== SENDING PAYLOAD TO BACKEND =====");
       print(jsonEncode(payload));
 
       final uri = Uri.parse(apiUrl);
@@ -186,19 +236,22 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver, Ti
 
       final data = jsonDecode(res.body);
 
+      // Save to Firestore
       if (user != null) {
         await FirebaseFirestore.instance
             .collection("users")
             .doc(user.uid)
-            .set({
+            .collection("assessments")
+            .add({
           "timestamp": FieldValue.serverTimestamp(),
           "api_result": data,
-          "images": urls,
+          "images": imageUrls,
           "phq_responses": _phqAnswers,
           "text": _textController.text.trim(),
         });
       }
 
+      // Navigate to results
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -206,7 +259,7 @@ class _TestScreenState extends State<TestScreen> with WidgetsBindingObserver, Ti
             apiResponse: data,
             phqAnswers: _phqAnswers,
             inputText: _textController.text.trim(),
-            imageUrls: urls,
+            imageUrls: imageUrls,
           ),
         ),
       );
